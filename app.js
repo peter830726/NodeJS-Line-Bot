@@ -1,6 +1,5 @@
-const PORT = process.env.PORT || 8080,
-  cluster = require('cluster'),
-  numCPUs = require('os').cpus().length,
+const PORT = process.env.PORT || require('./config/constant').PORT,
+  helmet = require('helmet'),
   co = require('co'),
   express = require('express'),
   path = require('path'),
@@ -13,8 +12,12 @@ const PORT = process.env.PORT || 8080,
   app = express(),
   http = require('http').Server(app);
 
-const webhookRouter = require('./routes/webhookRouter');
+const webhookRouter = require('./routes/webhookRouter'),
+  adminRouter = require('./routes/adminRouter'),
+  lineLoginRouter = require('./routes/lineLoginRouter'),
+  notifyRouter = require('./routes/notifyRouter');
 
+app.use(helmet());
 app.use(`/webhook`, webhookRouter);
 
 app.set('views', path.join(__dirname, 'views'));
@@ -26,7 +29,17 @@ app.use(expressValidator());
 app.use(cookieParser());
 
 // app.use(favicon(__dirname + '/public/favicon.ico'));
-app.use(`/`, express.static(path.join(__dirname, '/public')));
+app.use(`/`, express.static(path.join(__dirname, '/public/dist')));
+
+//router
+app.use(`/admin`, adminRouter);
+app.use(`/notify`, notifyRouter);
+app.use(`/lineLogin`, lineLoginRouter);
+
+app.use((err, req, res, next) => {
+  logger.apply({ 'err': err });
+  next();
+});
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -57,29 +70,6 @@ app.use(function (err, req, res, next) {
   });
 });
 
-var masterProcess = () => {
-  console.log(`Master ${process.pid} is running`);
-
-  for (let i = 0; i < numCPUs; i++) {
-    console.log(`Forking process number ${i}...`);
-    cluster.fork();
-  }
-}
-
-var childProcess = () => {
-  console.log(`Worker ${process.pid} started...`);
-  http.listen(PORT, () => {
-    console.log(`App listening on port ${PORT}`);
-  });
-}
-
-if (cluster.isMaster)
-  masterProcess();
-else
-  childProcess();
-
-
-// http.listen(PORT, () => {
-//   console.log(`App listening on port ${PORT}`);
-// });
-
+http.listen(PORT, () => {
+  console.log(`App listening on port ${PORT}`);
+});
